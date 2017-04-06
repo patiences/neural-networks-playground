@@ -4,6 +4,8 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from sklearn.neural_network import MLPClassifier
+import numpy as np
+import sys
 
 """ Code adapted from https://ubc-cs.github.io/cpsc340/ """
 
@@ -106,7 +108,7 @@ def tensorflow_convnet(data):
 
     model = Sequential()
     # 32 5x5 convolutions
-    model.add(Convolution2D(32, 5, 5, input_shape=data.img_dim+(1,), activation='relu'))
+    model.add(Convolution2D(32, (5, 5), input_shape=data.img_dim+(1,), activation='relu'))
     # 2x2 max pooling
     model.add(MaxPooling2D(pool_size=(2, 2)))
     model.add(Dropout(0.2))

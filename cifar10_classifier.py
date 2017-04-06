@@ -22,7 +22,7 @@ class Cifar10Data:
         self.X_train /= 255
         self.X_test /= 255
 
-        # H*W*n by 3 matrix
+        # n by H*W*3 matrix
         self.X_train_flat = self.X_train.reshape(50000, self.img_size*3)
         self.X_test_flat = self.X_test.reshape(10000, self.img_size*3)
 
@@ -31,7 +31,7 @@ class Cifar10Data:
         self.y_test = np_utils.to_categorical(self.y_test_cat, self.num_classes)
 
         if debug == True:
-            # for debugging with smaller samples,
+            # for debugging with smaller samples
             num_training = 100
             num_test = 10
 
