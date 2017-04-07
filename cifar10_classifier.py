@@ -4,6 +4,7 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
 import numpy as np
 import sys
 
@@ -32,8 +33,8 @@ class Cifar10Data:
 
         if debug == True:
             # for debugging with smaller samples
-            num_training = 100
-            num_test = 10
+            num_training = 1000
+            num_test = 100
 
             # Choose different examples (without replacement)
             training_sample_indices = np.random.choice(50000, num_training, replace=False)
@@ -127,10 +128,22 @@ def tensorflow_convnet(data):
     score = model.evaluate(X_test, y_test, verbose=0)
     print('Test accuracy:', score[1])
 
+def random_forest_classifier(data):
+    model = RandomForestClassifier()
+    model.fit(data.X_train_flat, data.y_train_cat)
+
+    print('With random forest classifier:')
+    score = model.score(data.X_train_flat, data.y_train_cat)
+    print('Training accuracy:', score)
+
+    score = model.score(data.X_test_flat, data.y_test_cat)
+    print('Test accuracy:', score)
+
 if __name__ == '__main__':
     debug = True if len(sys.argv) > 1 and sys.argv[1] == 'debug' else False
     data = Cifar10Data(debug=debug)
 
+    random_forest_classifier(data)
     sk_learn_nn(data)
     tensorflow_nn(data)
     tensorflow_convnet(data)
