@@ -6,7 +6,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report,confusion_matrix
 from keras.models import Sequential
-from keras.layers.core import Dense, Dropout, Activation, Flatten
+from keras.layers.core import Dense
+from sklearn.model_selection import GridSearchCV
+from keras.optimizers import SGD
 
 class BreastCancerData():
     def __init__(self):
@@ -15,6 +17,8 @@ class BreastCancerData():
         print(self.X_train.shape[0], 'training samples')
         print(self.X_test.shape[0], 'test samples')
 
+        print(self.X_train[0])
+
         # Perform scaling
         scaler = StandardScaler()
         scaler.fit(self.X_train)
@@ -22,33 +26,39 @@ class BreastCancerData():
         self.X_test = scaler.transform(self.X_test)
 
 def sk_learn_nn(data):
-    # 3 hidden layers with 30 units each
-    model = MLPClassifier(hidden_layer_sizes=(30,30,30)) # relu activation
-    model.fit(data.X_train, data.y_train)
+    model = MLPClassifier()
+
+    # hyperparameter search
+    activation = ['logistic', 'tanh', 'relu']
+    solver = ['adam', 'sgd', 'lbfgs']
+    hidden_layer_sizes = [(30, 30, 30), (50, 50, 50), (50, 40, 30), (100, 100)]
+    param_grid = dict(activation=activation, solver=solver,)
+    grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1)
+    grid_result = grid.fit(data.X_train, data.y_train)
 
     print('scikit-learn neural net:')
-    eval(model, data)
+    eval(grid_result, data)
 
-# FIXME dimensions of internal layers?
 def tensorflow_nn(data):
     model = Sequential()
 
     model.add(Dense(30, input_shape=(data.X_train.shape[1],), activation='relu'))
     model.add(Dense(30, activation='relu'))
     model.add(Dense(30, activation='relu'))
-    # Output layer is 2 classes
-    model.add(Dense(2, activation='softmax'))
+    # Output layer is 1
+    model.add(Dense(1, activation='sigmoid'))
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    model.compile(loss='binary_crossentropy', optimizer=sgd, metrix=['accuracy'])
 
-    model.compile(loss='categorical_crossentropy', optimizer='sgd', metrix=['accuracy'])
-    history = model.fit(data.X_train, data.y_train, batch_size=128, epochs=10, verbose=0)
+    history = model.fit(data.X_train, data.y_train, batch_size=128, epochs=100, verbose=0)
 
     print('tensorflow neural net:')
 
     score = model.evaluate(data.X_train, data.y_train, verbose=0)
-    print('Training accuracy:', score[1])
+    print('Training accuracy:', score)
 
     score = model.evaluate(data.X_test, data.y_test, verbose=0)
-    print('Test accuracy:', score[1])
+    print('Test accuracy:', score)
 
 def random_forest_classifier(data):
     model = RandomForestClassifier()

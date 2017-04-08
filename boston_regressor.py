@@ -49,25 +49,6 @@ def tensorflow_nn(data):
     score = model.evaluate(data.X_test, data.y_test, verbose=0)
     print('     Test accuracy:', score)
 
-# FIXME KerasRegressor Wrapper
-"""
-def base_model(data):
-    base_model = Sequential()
-
-    base_model.add(Dense(100, input_shape=(data.X_train.shape[1],), activation='relu'))
-    base_model.add(Dense(125, activation='relu'))
-    base_model.add(Dense(20, activation='relu'))
-    base_model.add(Dense(1))
-
-    base_model.compile(loss='mean_absolute_error', optimizer='adam')
-    return model
-
-def tensorflow_nn(data):
-    model = KerasRegressor(build_fn=base_model, nb_epoch=100, batch_size=128, verbose=0)
-    print('tensorflow neural net:')
-    eval(model, data)
-"""
-
 def linear_regressor(data):
     model = LinearRegression()
     model.fit(data.X_train, data.y_train)

@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from keras.datasets import cifar10
 from keras.utils import np_utils
 from keras.models import Sequential
@@ -5,6 +6,7 @@ from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
 import numpy as np
 import sys
 
@@ -33,8 +35,8 @@ class Cifar10Data:
 
         if debug == True:
             # for debugging with smaller samples
-            num_training = 1000
-            num_test = 100
+            num_training = 5000
+            num_test = 10000
 
             # Choose different examples (without replacement)
             training_sample_indices = np.random.choice(50000, num_training, replace=False)
@@ -63,6 +65,18 @@ def sk_learn_nn(data):
     model = MLPClassifier(hidden_layer_sizes=(175,130), max_iter=20, batch_size=128, activation='relu')
     model.fit(X_train_flat, y_train_cat)
 
+    """
+    # hyperparameter search
+    activation = ['logistic', 'tanh', 'relu']
+    solver = ['adam', 'sgd', 'lbfgs']
+    hidden_layer_sizes = [(100, 150), (100, 100), (175, 130)]
+    max_iter = [10, 15, 20]
+    batch_size = [16, 64, 128]
+    param_grid = dict(activation=activation, solver=solver, hidden_layer_sizes=hidden_layer_sizes, max_iter=max_iter, batch_size=batch_size)
+    grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1)
+    grid_result = grid.fit(X_train_flat, y_train_cat)
+    """
+
     print("With Scikit-Learn NN: ")
 
     score = model.score(X_train_flat, y_train_cat)
@@ -78,9 +92,8 @@ def tensorflow_nn(data):
     X_test_flat = data.X_test_flat
     y_test = data.y_test
 
-    model = Sequential() # as opposed to recurrent neural nets
-    # Need to specify input layer dimensions for compilation step
-    # This is 2 layers with 100 units each
+    model = Sequential()
+    # 2 layers with 100 units each
     model.add(Dense(100, input_shape=(X_train_flat.shape[1],), activation='relu'))
     model.add(Dense(100, activation='relu'))
     # Output layer is 10 classes
@@ -107,8 +120,11 @@ def tensorflow_convnet(data):
     model = Sequential()
     # 32 5x5 convolutions
     model.add(Convolution2D(32, (5, 5), input_shape=data.img_dim+(3,), activation='relu'))
-    # 2x2 max pooling
     model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Convolution2D(32, (5, 5), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
     model.add(Dropout(0.2))
     model.add(Flatten())
     # Hidden layer with 128 units
@@ -117,8 +133,13 @@ def tensorflow_convnet(data):
     model.add(Dense(data.num_classes, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    # Do not increase epochs unless running on a more powerful machine
-    history = model.fit(X_train, y_train, batch_size=128, epochs=1, verbose=0)
+    history = model.fit(X_train, y_train, batch_size=128, epochs=50, verbose=0, validation_data=(data.X_test, data.y_test))
+
+    # plot validation accuracy
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.legend(['train', 'test'])
+    plt.savefig('accuracy.pdf')
 
     print("With ConvNet:")
 
@@ -153,3 +174,9 @@ if __name__ == '__main__':
     gc.collect()
     from keras import backend
     backend.clear_session()
+
+"""
+With ConvNet:
+Training accuracy: 0.91664
+Test accuracy: 0.7022
+"""
