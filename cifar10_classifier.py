@@ -3,6 +3,7 @@ from keras.datasets import cifar10
 from keras.utils import np_utils
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
+from keras.preprocessing.image import ImageDataGenerator
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -20,6 +21,16 @@ class Cifar10Data:
         # the data, shuffled and split between train and test sets
         (self.X_train, self.y_train_cat), (self.X_test, self.y_test_cat) = cifar10.load_data()
 
+        # convert class vectors to binary class matrices
+        self.y_train = np_utils.to_categorical(self.y_train_cat, self.num_classes)
+        self.y_test = np_utils.to_categorical(self.y_test_cat, self.num_classes)
+
+        # data augmentation
+        self.datagen = ImageDataGenerator(featurewise_center=True, featurewise_std_normalization=True, rotation_range=20, width_shift_range=0.2, height_shift_range=0.2, horizontal_flip=True)
+        # compute quantities required for featurewise normalization
+        # (std, mean, and principal components if ZCA whitening is applied)
+        self.datagen.fit(self.X_train)
+
         self.X_train = self.X_train.astype('float32')
         self.X_test = self.X_test.astype('float32')
         self.X_train /= 255
@@ -28,10 +39,6 @@ class Cifar10Data:
         # n by H*W*3 matrix
         self.X_train_flat = self.X_train.reshape(50000, self.img_size*3)
         self.X_test_flat = self.X_test.reshape(10000, self.img_size*3)
-
-        # convert class vectors to binary class matrices
-        self.y_train = np_utils.to_categorical(self.y_train_cat, self.num_classes)
-        self.y_test = np_utils.to_categorical(self.y_test_cat, self.num_classes)
 
         if debug == True:
             # for debugging with smaller samples
@@ -63,6 +70,10 @@ def sk_learn_nn(data):
 
     # 2 hidden layers with 100 and 50 units respectively
     model = MLPClassifier(hidden_layer_sizes=(175,130), max_iter=20, batch_size=128, activation='relu')
+
+    print("Scikit-Learn NN: ")
+    print("     Model: ", model)
+
     model.fit(X_train_flat, y_train_cat)
 
     """
@@ -77,13 +88,11 @@ def sk_learn_nn(data):
     grid_result = grid.fit(X_train_flat, y_train_cat)
     """
 
-    print("With Scikit-Learn NN: ")
-
     score = model.score(X_train_flat, y_train_cat)
-    print('Training accuracy:', score)
+    print('     Training accuracy:', score)
 
     score = model.score(X_test_flat, y_test_cat)
-    print('Test accuracy:', score)
+    print('     Test accuracy:', score)
 
 def tensorflow_nn(data):
     X_train_flat = data.X_train_flat
@@ -103,13 +112,14 @@ def tensorflow_nn(data):
 
     history = model.fit(X_train_flat, y_train, batch_size=128, epochs=10, verbose=0)
 
-    print("With tensorFlow NN: ")
+    print("TensorFlow NN: ")
+    print("     Model: ", model.summary())
 
     score = model.evaluate(X_train_flat, y_train, verbose=0)
-    print('Training accuracy:', score[1])
+    print('     Training accuracy:', score[1])
 
     score = model.evaluate(X_test_flat, y_test, verbose=0)
-    print('Test accuracy:', score[1])
+    print('     Test accuracy:', score[1])
 
 def tensorflow_convnet(data):
     X_train = data.X_train
@@ -133,7 +143,9 @@ def tensorflow_convnet(data):
     model.add(Dense(data.num_classes, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    history = model.fit(X_train, y_train, batch_size=128, epochs=50, verbose=0, validation_data=(data.X_test, data.y_test))
+
+    history = model.fit_generator(data.datagen.flow(X_train, y_train, batch_size=32),
+                steps_per_epoch=len(X_train), epochs=60, verbose=0)
 
     # plot validation accuracy
     plt.plot(history.history['acc'])
@@ -141,42 +153,46 @@ def tensorflow_convnet(data):
     plt.legend(['train', 'test'])
     plt.savefig('accuracy.pdf')
 
-    print("With ConvNet:")
+    print("TensorFlow ConvNet:")
+    print("     Model: ", model.summary())
 
     score = model.evaluate(X_train, y_train, verbose=0)
-    print('Training accuracy:', score[1])
+    print('     Training accuracy:', score[1])
 
     score = model.evaluate(X_test, y_test, verbose=0)
-    print('Test accuracy:', score[1])
+    print('     Test accuracy:', score[1])
 
 def random_forest_classifier(data):
     model = RandomForestClassifier()
     model.fit(data.X_train_flat, data.y_train_cat)
 
-    print('With random forest classifier:')
+    print('Random forest classifier:')
+    print("     Model: ", model)
+
     score = model.score(data.X_train_flat, data.y_train_cat)
-    print('Training accuracy:', score)
+    print('     Training accuracy:', score)
 
     score = model.score(data.X_test_flat, data.y_test_cat)
-    print('Test accuracy:', score)
+    print('     Test accuracy:', score)
 
 if __name__ == '__main__':
+    # Save log output
+    sys.stdout = open("cifar10-results.txt","a+")
+    # Allow debugging with small sample size
     debug = True if len(sys.argv) > 1 and sys.argv[1] == 'debug' else False
+
     data = Cifar10Data(debug=debug)
 
     random_forest_classifier(data)
     sk_learn_nn(data)
     tensorflow_nn(data)
     tensorflow_convnet(data)
+    print("==============================================================================")
+
+    sys.stdout.close()
 
     # Cleanup for keras: https://github.com/tensorflow/tensorflow/issues/3388
     import gc
     gc.collect()
     from keras import backend
     backend.clear_session()
-
-"""
-With ConvNet:
-Training accuracy: 0.91664
-Test accuracy: 0.7022
-"""
