@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from keras.datasets import cifar10
 from keras.utils import np_utils
 from keras.models import Sequential
+from keras.callbacks import ModelCheckpoint
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.preprocessing.image import ImageDataGenerator
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
@@ -10,6 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 import numpy as np
 import sys
+import h5py
 
 class Cifar10Data:
     def __init__(self, debug=False):
@@ -76,18 +78,6 @@ def sk_learn_nn(data):
 
     model.fit(X_train_flat, y_train_cat)
 
-    """
-    # hyperparameter search
-    activation = ['logistic', 'tanh', 'relu']
-    solver = ['adam', 'sgd', 'lbfgs']
-    hidden_layer_sizes = [(100, 150), (100, 100), (175, 130)]
-    max_iter = [10, 15, 20]
-    batch_size = [16, 64, 128]
-    param_grid = dict(activation=activation, solver=solver, hidden_layer_sizes=hidden_layer_sizes, max_iter=max_iter, batch_size=batch_size)
-    grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1)
-    grid_result = grid.fit(X_train_flat, y_train_cat)
-    """
-
     score = model.score(X_train_flat, y_train_cat)
     print('     Training accuracy:', score)
 
@@ -110,15 +100,15 @@ def tensorflow_nn(data):
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-    history = model.fit(X_train_flat, y_train, batch_size=128, epochs=10, verbose=0)
+    history = model.fit(X_train_flat, y_train, batch_size=128, epochs=10, verbose=1)
 
     print("TensorFlow NN: ")
     print("     Model: ", model.summary())
 
-    score = model.evaluate(X_train_flat, y_train, verbose=0)
+    score = model.evaluate(X_train_flat, y_train, verbose=1)
     print('     Training accuracy:', score[1])
 
-    score = model.evaluate(X_test_flat, y_test, verbose=0)
+    score = model.evaluate(X_test_flat, y_test, verbose=1)
     print('     Test accuracy:', score[1])
 
 def tensorflow_convnet(data):
@@ -144,8 +134,16 @@ def tensorflow_convnet(data):
 
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
+    # checkpoint -- save the state of the model as we go
+    filepath="cifar10-checkpoints/weights-{epoch:02d}-{val_acc:.2f}.hdf5"
+    checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=False, save_weights_only=False, mode='auto', period=1)
+    callbacks = [checkpoint]
+
+    # Trains the model, using generated batches of augmented data for training and validation.
     history = model.fit_generator(data.datagen.flow(X_train, y_train, batch_size=32),
-                steps_per_epoch=len(X_train), epochs=60, verbose=0)
+                # validation_steps = # unique samples in training set / batch_size https://keras.io/models/sequential/#fit_generator
+                validation_data=data.datagen.flow(X_train, y_train, batch_size=32), validation_steps=len(data.X_train)/32,
+                steps_per_epoch=len(X_train), epochs=60, callbacks=callbacks, verbose=1)
 
     # plot validation accuracy
     plt.plot(history.history['acc'])
@@ -156,10 +154,10 @@ def tensorflow_convnet(data):
     print("TensorFlow ConvNet:")
     print("     Model: ", model.summary())
 
-    score = model.evaluate(X_train, y_train, verbose=0)
+    score = model.evaluate(X_train, y_train, verbose=1)
     print('     Training accuracy:', score[1])
 
-    score = model.evaluate(X_test, y_test, verbose=0)
+    score = model.evaluate(X_test, y_test, verbose=1)
     print('     Test accuracy:', score[1])
 
 def random_forest_classifier(data):
@@ -176,8 +174,7 @@ def random_forest_classifier(data):
     print('     Test accuracy:', score)
 
 if __name__ == '__main__':
-    # Save log output
-    sys.stdout = open("cifar10-results.txt","a+")
+
     # Allow debugging with small sample size
     debug = True if len(sys.argv) > 1 and sys.argv[1] == 'debug' else False
 
@@ -188,8 +185,6 @@ if __name__ == '__main__':
     tensorflow_nn(data)
     tensorflow_convnet(data)
     print("==============================================================================")
-
-    sys.stdout.close()
 
     # Cleanup for keras: https://github.com/tensorflow/tensorflow/issues/3388
     import gc
